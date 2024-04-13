@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turn-Based Hex Game</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+
+        .popup2 {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            color: red;
+            opacity: 0;
+            transition: all 0.5s ease-in-out;
+            z-index: 9999;
+        }
+
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #ffffff;
+            padding: 20px;
+            border: 2px solid #000000;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .popup button {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background-color: #59b4f3;
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+        }
+
+        .popup button:hover {
+            background-color: #3a8bc5;
+        }
+
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+
+<div id="armyPanel"
+     style="position: absolute; top: 0; left: 810px; width: 300px; height: 100%; background-color: #59b4f3; border: 2px solid gold; box-shadow: 0px 0px 5px black; padding: 10px;">
+    <h2>Army Info</h2>
+    <span style="font-weight: bold">Army Name:</span> <span id="armyName"></span> <br>
+    <span style="font-weight: bold">Id:</span> <span id="armyId"></span> <br>
+    <span style="font-weight: bold">Owner:</span> <span id="armyOwner"></span> <br>
+    <span style="font-weight: bold">Total Power:</span> <span id="armyPower"></span> <br>
+    <span style="font-weight: bold">Exhaustion:</span> <span id="armyExhaustion"></span> <br>
+    <span style="font-weight: bold">Position:</span> <span id="armyPosition"></span> <br>
+    <span style="font-weight: bold">Move Range:</span> <span id="armyMoveRange"></span> <br>
+    <span style="font-weight: bold">Units:</span> <span id="armyUnits"></span> <br>
+
+    <br>
+</div>
+
+<div id="popup" class="popup2"></div>
+
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+
+  const HEX_SIZE = 30; // Size of each hexagon
+  const HEX_HEIGHT = HEX_SIZE; // Height of the hexagon
+  const HEX_WIDTH = HEX_SIZE * 2; // Width of the hexagon
+  const GRID_WIDTH = 13; // Number of hexagons in a row
+  const GRID_HEIGHT = 13; // Number of hexagons in a column
+
+  // Define colors for water and land
+  const WATER_COLOR = 'darkblue';
+  const LAND_COLOR = '#F4A460';
+
+
+  // START MAP AREA
+  // Map area, hard code create a new map.
+  // Create a two-dimensional array to represent the grid
+  let grid = [];
+
+  function createNewMap() {
+    // Initialize the grid with water (0) everywhere
+    for (let i = 0; i < GRID_HEIGHT; i++) {
+      grid[i] = [];
+      for (let j = 0; j < GRID_WIDTH; j++) {
+        // grid[i][j] = {terrain: 0, armyId: null, resourceId: null, ownerId: null}; // Water
+        grid[i][j] = {terrain: 0}; // Water
+      }
+    }
+
+    // Define the target number of land blocks
+    const TARGET_LAND_BLOCKS = 70;
+    let landBlocks = 0;
+
+    // Randomly generate a starting point for the landmass
+    let startX = Math.floor(Math.random() * GRID_WIDTH);
+    let startY = Math.floor(Math.random() * GRID_HEIGHT);
+
+    // Expand the landmass until reaching the target number of land blocks
+    while (landBlocks < TARGET_LAND_BLOCKS) {
+      // Set the current cell to land if it's within the grid bounds and not already land
+      if (grid[startY][startX].terrain === 0) {
+        grid[startY][startX].terrain = 1; // Land
+        setResource(grid[startY][startX]);
+        landBlocks++;
+      }
+
+      // Randomly choose a neighboring cell to continue expanding the landmass
+      const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+      const [dx, dy] = directions[Math.floor(Math.random() * directions.length)];
+
+      // Calculate the next position
+      const nextX = startX + dx;
+      const nextY = startY + dy;
+
+      // Check if the next position is within the bounds of the grid
+      if (nextX >= 0 && nextX < GRID_WIDTH && nextY >= 0 && nextY < GRID_HEIGHT) {
+        // Move to the neighboring cell
+        startX = nextX;
+        startY = nextY;
+      }
+    }
+
+    // Output the grid to console (for visualization)
+    // console.log(grid);
+
+    // Convert the grid array to a JSON string
+    const gridString = JSON.stringify(grid);
+    // Output the grid string to console
+    // console.log(gridString);
+
+    // Convert the JSON string back to a grid array
+    const copiedGrid = JSON.parse(gridString);
+    // Output the copied grid to console
+    console.log(copiedGrid);
+    // right click in console to copy map object.
+  }
+
+  // Picks a random resource to show on this hex, and gain when take over.
+  function setResource(gridCell) {
+    // Set resource type randomly to o, g, e, or s
+    // orbs, gold, experience scroll, or summon token.
+    // key too?
+    const resourceTypes = ['o', 'g', 'e', 's'];
+    const randomIndex = Math.floor(Math.random() * resourceTypes.length);
+    const resourceType = resourceTypes[randomIndex];
+    gridCell.resourceType = resourceType;
+
+    // If the resource type is 'o' (ore), set a random resourceId (1-10)
+    if (resourceType === 'o') {
+      const resourceId = Math.floor(Math.random() * 10) + 1;
+      gridCell.resourceId = resourceId;
+    }
+  }
+
+
+  createNewMap(); // temp to create new map.
+
+    // Sample hard coded map here.
+  grid =
+    [
+      [
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 7
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 1
+        },
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        }
+      ],
+      [
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 9
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 4
+        },
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        }
+      ],
+      [
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 7
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 1
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        }
+      ],
+      [
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 1
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 5
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 7
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        }
+      ],
+      [
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 8
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 5
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 2
+        },
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        }
+      ],
+      [
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 7
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 4
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        }
+      ],
+      [
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 6
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 9
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        }
+      ],
+      [
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 9
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 3
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 8
+        },
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 0
+        }
+      ],
+      [
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 1,
+          "resourceType": "s"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "o",
+          "resourceId": 1
+        },
+        {
+          "terrain": 0
+        }
+      ],
+      [
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 1,
+          "resourceType": "g"
+        },
+        {
+          "terrain": 1,
+          "resourceType": "e"
+        }
+      ],
+      [
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        }
+      ],
+      [
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        }
+      ],
+      [
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        },
+        {
+          "terrain": 0
+        }
+      ]
+    ]
+
+  // END MAP AREA
+
+
+  // Setup who owns hexes.
+  // TODO pull from db.
+  grid[6][7].ownerId = 1;
+  grid[8][10].ownerId = 2;
+
+  // TODO include all units in each army...
+
+  // Hard coded list of armies to test with.
+  const armies = {
+    11: {
+      id: 11,
+      ownerId: 1,
+      name: "dwarf crew",
+      power: 20000,
+      exhaustion: 0,
+      position: {x: 6, y: 6},
+      moveRange: 5
+    },
+    12: {
+      id: 12,
+      ownerId: 1,
+      name: "ranger crew",
+      power: 20000,
+      exhaustion: 0,
+      position: {x: 7, y: 6},
+      moveRange: 5
+    },
+    22: {
+      id: 22,
+      ownerId: 2,
+      name: "skeleton crew",
+      power: 20000,
+      exhaustion: 150,
+      position: {x: 7, y: 9},
+      moveRange: 1
+    },
+    23: {
+      id: 23,
+      ownerId: 2,
+      name: "skeleton archers",
+      power: 20000,
+      exhaustion: 0,
+      position: {x: 8, y: 9},
+      moveRange: 1
+    }
+  };
+
+  // Hard coded list of units to test with.
+  const units = {
+    11: {
+      id: 11,
+      armyId: 11,
+      ownerId: 1,
+      name: "mighty dwarf",
+      strength: 4,
+      defense: 3,
+      health: 175,
+      maxHealth: 175,
+      position: {x: 4, y: 3},
+      meleeDamage: 40
+      // TODO objects array for attack types?
+    },
+    12: {
+      id: 12,
+      armyId: 11,
+      ownerId: 1,
+      name: "ranger",
+      strength: 2,
+      defense: 3,
+      health: 150,
+      maxHealth: 150,
+      position: {x: 6, y: 4},
+      meleeDamage: 10,
+      rangeDamage: 30
+    },
+    22: {
+      id: 22,
+      armyId: 22,
+      ownerId: 2,
+      name: "skeleton",
+      strength: 2,
+      defense: 2,
+      health: 50,
+      maxHealth: 50,
+      position: {x: 8, y: 4},
+      meleeDamage: 10,
+    },
+    23: {
+      id: 23,
+      armyId: 22,
+      ownerId: 2,
+      name: "skeleton",
+      strength: 2,
+      defense: 2,
+      health: 50,
+      maxHealth: 50,
+      position: {x: 9, y: 3},
+      meleeDamage: 10,
+    }
+  };
+
+
+  // Place all armies on map now.
+  function setArmyPositionsOnGrid(armies) {
+    Object.values(armies).forEach(army => {
+      const {id, ownerId, position} = army;
+      const {x, y} = position;
+      if (grid[x] && grid[x][y]) {
+        grid[x][y].armyId = id;
+        grid[x][y].ownerId = ownerId;
+      }
+    });
+  }
+
+  // Call the function to set army positions on the grid
+  setArmyPositionsOnGrid(armies);
+
+
+  // Setup some global values.
+  let currentArmy;
+
+  // Get references to army panel elements
+  const armyPanel = document.getElementById('armyPanel');
+  const armyNameElement = document.getElementById('armyName');
+  const armyIdElement = document.getElementById('armyId');
+  const armyOwnerElement = document.getElementById('armyOwner');
+  const armyPowerElement = document.getElementById('armyPower');
+  const armyExhaustionElement = document.getElementById('armyExhaustion');
+  const armyPositionElement = document.getElementById('armyPosition');
+  const armyMoveRangeElement = document.getElementById('armyMoveRange');
+  const armyUnitsElement = document.getElementById('armyUnits');
+
+
+  // Get the popup element
+  const popup = document.getElementById('popup');
+
+
+  // BEGIN MAIN METHODS NOW
+
+  // When player clicks the map, check hexes and things clicked on.
+  canvas.addEventListener('click', function (event) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Calculate the grid position of the clicked hexagon
+    const y = Math.floor(mouseY / (HEX_HEIGHT * 1.5));
+    const x = Math.floor((mouseX - (y % 2) * (HEX_WIDTH / 2)) / HEX_WIDTH);
+    console.log(`Debug clicked on hex ${x},${y}`)
+
+    // Check if an army was clicked.
+    const targetArmy = armies[grid[x][y].armyId];
+    if (targetArmy) {
+      console.log("DEBUG target army = ", targetArmy)
+    }
+
+    // TODO see if any other army is clicked attackable.
+    // TODO see if any land blocker is clicked, or water.
+    // TODO Try and move this unit to this hex
+    // For now, ONLY allow 1 move distance.
+    // Find the unit with unitTurn as id
+    // TODO highlight move range.
+
+    // TODO click on empty hex show resources etc. owner.
+    if (!targetArmy) {
+      // return;
+    }
+
+    // if no currentArmy, onclick selects it now
+    // TODO later handle multiple armies in same hex, altArmy
+    if (!currentArmy && targetArmy) {
+      currentArmy = targetArmy;
+      // DO POPUP TOO
+      showArmyPanel(currentArmy);
+      updateGame();
+      return;
+    }
+    // If clicking same army, deselects it.
+    if (targetArmy && currentArmy && targetArmy.id === currentArmy.id) {
+      currentArmy = null
+      updateGame();
+      return
+    }
+    // For now clicking any other army you own selects it.
+    if (targetArmy && targetArmy.ownerId === 1) {
+      currentArmy = targetArmy;
+      // DO POPUP TOO
+      showArmyPanel(currentArmy);
+      updateGame();
+      return;
+    }
+    // Clicking from one enemy to another enemy works.
+    if (targetArmy && targetArmy.ownerId !== 1 && currentArmy && currentArmy.ownerId !== 1) {
+      currentArmy = targetArmy;
+      // DO POPUP TOO
+      showArmyPanel(currentArmy);
+      updateGame();
+      return;
+    }
+
+    // Our army currently ,try to move or attack here.
+    if (currentArmy && currentArmy.ownerId === 1) {// hard coded for now.
+      console.log(` debug currentArmy.position. = `, currentArmy.position);
+      const moveDist = hexDistance(currentArmy.position.x, currentArmy.position.y, x, y)
+      console.log(`DEBUG moveDist=${moveDist}`)
+      if (moveDist > currentArmy.moveRange) {
+        console.log("Too far away")
+        return;
+      }
+
+      if (moveDist + currentArmy.exhaustion > 10) {  // TODO ten to test.
+        alert("Too exhausted to move that far, rest up some!");
+        return;
+      }
+
+      // TODO make sure hex is touching another hex we own, or we cannot attack or move.
+      if (!isTouchingHexWeOwn(x, y)) {
+        alert("Must be touching a hex you own. ")
+        return;
+      }
+
+      // See if we are trying to attack now.
+      if (targetArmy) {
+        if (targetArmy.ownerId === currentArmy.ownerId) {
+          console.log("Cant attack self, skipping.");
+          return;
+        }
+        console.log("ATTACK POPUP NOW")
+
+        // attack popup window w options.
+        showAttackPopup(currentArmy, targetArmy);
+
+        return;
+      }
+
+
+      // TODO MAKE METHOD. generalized.
+      // Block moving in water.
+      if (grid[x][y].terrain === 0) {
+        console.log(`Cant move army into water. at ${x},${y}`);
+        return;
+      }
+
+
+      // Do move now.
+      // Remove id from old grid to new.
+      grid[currentArmy.position.x][currentArmy.position.y].armyId = null;
+
+      currentArmy.position = {x: x, y: y};
+      // If we dont own it already, grab resources.
+      if (currentArmy.ownerId !== 1) {
+        collectResource(x,y);
+      }
+      // TODO maybe delay an hour or two for these so people dont trade them back and forth easy for free?
+      grid[currentArmy.position.x][currentArmy.position.y].armyId = currentArmy.id;
+      grid[currentArmy.position.x][currentArmy.position.y].ownerId = currentArmy.ownerId;
+      // Add exhaustion, 1 point per move.
+      currentArmy.exhaustion += moveDist;
+      showArmyPanel(currentArmy);
+
+      updateGame();
+    } // if current army is owner.
+
+  });
+
+  function showAttackPopup(attacker, defender) {
+    // Create a popup window
+    const popup = document.createElement('div');
+    popup.classList.add('popup');
+
+    // Create content for the popup
+    const content = document.createElement('div');
+    content.innerHTML = `
+        <p><b>Attack Options:</b></p>
+        <p>Attacker: ${attacker.name} Power: ${attacker.power.toLocaleString()} </p>
+        <p>Defender: ${defender.name} Power: ${defender.power.toLocaleString()} </p>
+        <button id="attackButton">Attack</button>
+        <button id="cancelButton">Cancel</button>
+        <div id="attackArmyUnits">TEST </div>
+    `;
+
+    // Create an attack button
+    const attackButton = content.querySelector('#attackButton');
+    attackButton.addEventListener('click', () => {
+      // Perform the attack action
+      performAttack(attacker, defender);
+      document.body.removeChild(popup);
+    });
+
+    // Create a cancel button
+    const cancelButton = content.querySelector('#cancelButton');
+    cancelButton.addEventListener('click', () => {
+      document.body.removeChild(popup);
+    });
+
+    // Add content to the popup
+    popup.appendChild(content);
+    // Add the popup to the document body
+    document.body.appendChild(popup);
+
+    // Display army units
+    showAttackArmyUnits(attacker, defender);  // move this into the div section instead.
+  }
+
+  function showAttackArmyUnits(attacker, defender) {
+    const armyUnitsElement = document.getElementById('attackArmyUnits');
+    armyUnitsElement.innerHTML = '';
+    const attackerUnits = getUnitsInArmy(attacker.id);
+    const defenderUnits = getUnitsInArmy(defender.id);
+
+    appendUnitsToElement(attackerUnits, 'Attacker Units:', armyUnitsElement);
+    appendUnitsToElement(defenderUnits, 'Defender Units:', armyUnitsElement);
+  }
+
+  function getUnitsInArmy(armyId) {
+    return Object.values(units).filter(unit => unit.armyId === armyId);
+  }
+
+  function appendUnitsToElement(units, title, element) {
+    const titleElement = document.createElement('p');
+    titleElement.innerHTML = `<b>${title}</b>`;
+    element.appendChild(titleElement);
+
+    units.forEach(unit => {
+      const unitElement = document.createElement('p');
+      unitElement.textContent = `${unit.name} - Health: ${unit.health}/${unit.maxHealth}`;
+      element.appendChild(unitElement);
+    });
+  }
+
+  function performAttack(attacker, defender) {
+    // Perform attack logic here
+    // TODO RESOLVE.
+    // get resources if win.
+
+    console.log(`${attacker.name} is attacking ${defender.name}`);
+  }
+
+
+  function collectResource(x, y) {
+    const hex = grid[x][y];
+    const resourceName = getResourceName(hex.resourceType);
+
+    // TODO add actual resource to your inventory.
+
+    // Create a popup window
+    const popup = document.createElement('div');
+    popup.classList.add('popup');
+
+    // Create content for the popup
+    const content = document.createElement('div');
+    content.textContent = `You collected ${resourceName} from this hex.`;
+
+    // Create a close button
+    const closeButton = document.createElement('button');
+    closeButton.textContent = 'Close';
+    closeButton.addEventListener('click', () => {
+      document.body.removeChild(popup); // Close the popup when the close button is clicked
+    });
+
+    // Add content and close button to the popup
+    popup.appendChild(content);
+    popup.appendChild(closeButton);
+
+    // Add the popup to the document body
+    document.body.appendChild(popup);
+  }
+
+
+
+
+
+  // Draw each hex, either the army if occupied or the regular terrain there.
+  function drawHex(x, y) {
+    const yOffset = y * HEX_HEIGHT * 1.5;
+    const xOffset = (y % 2 === 0 ? 0 : HEX_WIDTH / 2) + x * HEX_WIDTH;
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+
+    const hex = grid[x][y];
+
+    // Is there an army on this hex?
+    if (!grid[x][y].armyId) {
+      // Show land terrain.
+      // Set the fill style based on cell value (0 for water, 1 for land)
+      ctx.fillStyle = grid[x][y].terrain === 0 ? WATER_COLOR : LAND_COLOR;
+
+      ctx.beginPath();
+      ctx.moveTo(xOffset + HEX_SIZE, yOffset);
+      ctx.lineTo(xOffset + HEX_WIDTH, yOffset + HEX_HEIGHT / 2);
+      ctx.lineTo(xOffset + HEX_WIDTH, yOffset + HEX_HEIGHT * 1.5);
+      ctx.lineTo(xOffset + HEX_SIZE, yOffset + HEX_HEIGHT * 2);
+      ctx.lineTo(xOffset, yOffset + HEX_HEIGHT * 1.5);
+      ctx.lineTo(xOffset, yOffset + HEX_HEIGHT / 2);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+
+      // Draw coordinates inside hexagon
+      ctx.fillStyle = 'black';
+      ctx.fillText(`${x},${y}`, xOffset + HEX_SIZE - 10, yOffset + HEX_HEIGHT / 2);
+
+      // If hex is owned, indicate it with colored dots.
+      // TODO
+      if (hex.ownerId) {
+        drawHexWithDots(ctx, xOffset, yOffset, hex.ownerId);
+      }
+
+    } else {
+      // Draw army hex now.
+      const army = armies[grid[x][y].armyId];
+
+      ctx.fillStyle = grid[x][y].ownerId === 1 ? 'cyan' : 'red'; // Set color based on owner
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = 2;
+      // TODO make method.
+      ctx.beginPath();
+      ctx.moveTo(xOffset + HEX_SIZE, yOffset);
+      ctx.lineTo(xOffset + HEX_WIDTH, yOffset + HEX_HEIGHT / 2);
+      ctx.lineTo(xOffset + HEX_WIDTH, yOffset + HEX_HEIGHT * 1.5);
+      ctx.lineTo(xOffset + HEX_SIZE, yOffset + HEX_HEIGHT * 2);
+      ctx.lineTo(xOffset, yOffset + HEX_HEIGHT * 1.5);
+      ctx.lineTo(xOffset, yOffset + HEX_HEIGHT / 2);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+
+      // Draw coordinates inside hexagon
+      ctx.fillStyle = 'black';
+      // ctx.fillText(`${x},${y}`, xOffset + HEX_SIZE - 10, yOffset + HEX_HEIGHT / 2);
+      const unitNameWidth = ctx.measureText(army.name).width;
+      const textX = xOffset + (HEX_WIDTH - unitNameWidth) / 2;
+      const textY = yOffset + HEX_HEIGHT + 5;
+      ctx.fillText(army.name, textX, textY);
+      // ctx.fillText(`${army.unitCount}`, xOffset + HEX_SIZE - 15, yOffset + HEX_HEIGHT / 1.5);
+
+    }
+
+    // If hex is not owned by you, show resource set there.
+    if (hex.ownerId !== 1 && hex.terrain !== 0) {
+      const resourceName = getResourceName(hex.resourceType);
+      ctx.fillStyle = 'black';
+      ctx.fillText(`${resourceName}`, xOffset + HEX_SIZE - 10, yOffset + HEX_HEIGHT / 2 + 10);
+    }
+
+  }
+
+  function getResourceName(resourceType) {
+    switch (resourceType) {
+      case 'o':
+        return 'Orbs';
+      case 'g':
+        return 'Gold';
+      case 'e':
+        return 'Experience';
+      case 's':
+        return 'Summon';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  function isTouchingHexWeOwn(x, y) {
+    const currentPlayerId = 1; // HARDCODED
+
+    // Check if any neighboring hexagon is owned by the player
+    const neighbors = [
+      {dx: 1, dy: 0},  // Right
+      {dx: -1, dy: 0}, // Left
+      {dx: 0, dy: 1},  // Down
+      {dx: 0, dy: -1}, // Up
+      {dx: y % 2 === 0 ? -1 : 1, dy: -1}, // Up-Right
+      {dx: y % 2 === 0 ? 0 : 1, dy: 1}   // Down_Right? down left
+    ];
+    // odd 3,3 to 4,4   +1,+1 is not here...
+
+    for (const neighbor of neighbors) {
+      const neighborX = x + neighbor.dx;
+      const neighborY = y + neighbor.dy;
+
+      // Check if the neighboring hexagon is within bounds
+      if (neighborX >= 0 && neighborX < GRID_WIDTH && neighborY >= 0 && neighborY < GRID_HEIGHT) {
+        // Check if the neighboring hexagon is owned by the player
+        if (grid[neighborX][neighborY].ownerId === currentPlayerId) {
+          console.log("hit good at x,y=", neighborX, neighborY);
+          return true; // At least one neighboring hexagon is owned by the player
+        }
+      }
+    }
+
+    return false; // None of the neighboring hexagons are owned by the player
+  }
+
+  // Function to draw a dot
+  function drawDot(ctx, x, y, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Function to draw hexagon with dots of player's color
+  function drawHexWithDots(ctx, xoffset, yOffset, ownerId) {
+    // TEMP HACK
+    let color;
+    if (ownerId === 1) {
+      color = 'cyan';
+    } else {
+      color = 'red';
+    }
+
+    // Draw the hexagon
+    // (Assuming drawHex function already exists)
+    // drawHex(x, y, color); // Draw the hexagon with the specified color
+
+    // Define the density of dots
+    const dotDensity = 0.1; // Adjust as needed
+
+    // Calculate the area of the hexagon
+    const hexRadius = HEX_SIZE;
+    const hexWidth = Math.sqrt(3) * hexRadius;
+    const hexHeight = 2 * hexRadius;
+    const hexagonArea = (3 * Math.sqrt(3) / 2) * Math.pow(hexRadius, 2);
+
+    // Calculate the number of dots based on the density
+    const numDots = Math.round(hexagonArea * dotDensity);
+
+    // SET RAND WITH A PATTERN???? or it will constantly change annoyingly.
+
+    // Draw random dots within the hexagon
+    for (let i = 0; i < numDots; i++) {
+      // Generate random coordinates within the hexagon
+      const dotX = xoffset + hexWidth / 2 + Math.random() * hexWidth;
+      const dotY = yOffset + hexHeight / 2 + Math.random() * hexHeight;
+
+      // Draw the dot
+      drawDot(ctx, dotX, dotY, color);
+    }
+  }
+
+
+  // Function to display the popup
+  // for a dead army, text floating.
+  function showPopup() {
+    // Set initial styles
+    popup.style.opacity = '1';
+    popup.style.fontSize = '20px';
+
+    // Set the text content
+    popup.textContent = 'DEAD!';
+
+    // Increase font size
+    popup.style.fontSize = '40px';
+
+    // Decrease font size after a delay
+    setTimeout(() => {
+      popup.style.fontSize = '20px';
+    }, 500);
+
+    // Fade out after a delay
+    setTimeout(() => {
+      popup.style.opacity = '0';
+    }, 1000);
+  }
+
+
+  // Function to show army panel.
+  function showArmyPanel(army) {
+    armyNameElement.textContent = army.name;
+    armyIdElement.textContent = army.id;
+    armyOwnerElement.textContent = army.ownerId;
+    armyPowerElement.textContent = army.power;
+    armyExhaustionElement.textContent = army.exhaustion;
+    armyPositionElement.textContent = army.position.x + ", " + army.position.y;
+    armyMoveRangeElement.textContent = army.moveRange;
+
+    // loop over each unit in army.
+    armyUnitsElement.innerHTML = showArmyUnits(army.id);
+    // TODO make clickable and images etc.
+
+  }
+
+  function showArmyUnits(armyId) {
+    let output = '';
+    const unitsInArmy = Object.values(units).filter(unit => unit.armyId === armyId);
+    unitsInArmy.forEach(unit => {
+      output += `<br><b>Name:</b> ${unit.name}, <b>Health:</b> ${unit.health}/${unit.maxHealth}`;
+    });
+
+    return output;
+  }
+
+  // Function to calculate distance between two hexagons using offset coordinates
+  function hexDistance(p1x, p1y, p2x, p2y) {
+    ax = p1x - Floor2(p1y);
+    ay = p1x + Ceil2(p1y);
+    bx = p2x - Floor2(p2y);
+    by = p2x + Ceil2(p2y)
+    dx = bx - ax;
+    dy = by - ay;
+    if (Math.sign(dx) === Math.sign(dy)) {
+      return Math.max(Math.abs(dx), Math.abs(dy));
+    }
+    return Math.abs(dx) + Math.abs(dy);
+  }
+
+  function Floor2(x) {
+    return ((x >= 0) ? (x >> 1) : (x - 1) / 2);
+  }
+
+  function Ceil2(x) {
+    return ((x >= 0) ? ((x + 1) >> 1) : x / 2);
+  }
+
+
+
+
+  function drawGrid() {
+    for (let i = 0; i < GRID_HEIGHT; i++) {
+      for (let j = 0; j < GRID_WIDTH; j++) {
+        drawHex(j, i);
+      }
+    }
+
+    // Show selected army.
+    // Draw green border if it's this army turn.
+    if (currentArmy) {
+      ctx.strokeStyle = 'green';
+      ctx.lineWidth = 4;
+      const yOffset = currentArmy.position.y * HEX_HEIGHT * 1.5;
+      const xOffset = (currentArmy.position.y % 2 === 0 ? 0 : HEX_WIDTH / 2) + currentArmy.position.x * HEX_WIDTH;
+      ctx.strokeRect(xOffset - 5, yOffset - 5, HEX_WIDTH + 10, HEX_HEIGHT + 40);
+    }
+
+  }
+
+  function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function updateGame() {
+    clearCanvas();
+    drawGrid();
+  }
+
+  updateGame();
+
+  // TODO LIST OF THINGS TO DO
+  /*
+
+
+PHASE ONE:
+
+    DATABASE:
+        Connect to db.
+
+        Load armies and units from db.
+
+        Save db objects back.
+
+        Save and load grid maps to DB.
+
+    Setup global resource objects.
+        gold,
+        exp scrolls.
+        orbs
+
+
+    MAPS:
+        Increase map size. Flexible sizes/
+
+    ARMIES & UNITS:
+        Make Army View page.
+
+        Add level and rank for units.
+
+        Add training for units.
+
+    FIGHTING:
+        Finish Quick Fight Panel.
+        Add exp rewards.
+        Add default? armies on hexes unowned.
+
+    GRAPHICS:
+        Add army images.
+
+
+    Setup Github project.
+
+    Talk with Scouter see if he wants to join.
+
+    Add in city building.
+
+    USER INTERFACES:
+        Add footer bar - play - heroes - inbox - shop?
+
+    BUGS:
+        TODO onclick hex is slightly off.
+
+    PLAYERS:
+        Make player accounts and test with second one.
+
+        Make player registration.
+
+        Make player page and total power info.
+
+
+
+PHASE TWO:
+    Make multiple maps.
+
+    Add expeditions.
+
+    Add mines.
+
+    Add secondary stats for units.
+
+
+PHASE THREE:
+
+
+   */
+</script>
+</body>
+</html>

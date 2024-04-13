@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turn-Based Hex Game</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            color: red;
+            opacity: 0;
+            transition: all 0.5s ease-in-out;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<div id="unitPanel"
+     style="position: absolute; top: 0; right: 0; width: 200px; height: 100%; background-color: #59b4f3;">
+    <h2>Unit Info</h2>
+    <span style="font-weight: bold">Name:</span> <span id="unitName"></span> <br>
+    <span style="font-weight: bold">Strength:</span> <span id="unitStrength"></span> <br>
+    <span style="font-weight: bold">Defense:</span> <span id="unitDefense"></span> <br>
+    <span style="font-weight: bold">Health:</span> <span id="unitHealth"></span> / <span id="unitMaxHealth"></span> <br>
+    <br>
+</div>
+
+<div id="popup" class="popup"></div>
+
+<button id="moveAIButton">Move AI</button>
+<button id="attackButton">Attack</button>
+
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const moveAIButton = document.getElementById('moveAIButton');
+  const attackButton = document.getElementById('attackButton');
+
+  const HEX_SIZE = 30; // Size of each hexagon
+  const HEX_HEIGHT = HEX_SIZE; // Height of the hexagon
+  const HEX_WIDTH = HEX_SIZE * 2; // Width of the hexagon
+  const GRID_WIDTH = 13; // Number of hexagons in a row
+  const GRID_HEIGHT = 13; // Number of hexagons in a column
+
+  // Define colors for water and land
+  const WATER_COLOR = 'darkblue';
+  const LAND_COLOR = '#F4A460';
+
+
+  // START MAP AREA
+  // Map area, hard code create a new map.
+  // Create a two-dimensional array to represent the grid
+  let grid = [];
+
+  function createNewMap() {
+    // Initialize the grid with water (0) everywhere
+    for (let i = 0; i < GRID_HEIGHT; i++) {
+      grid[i] = [];
+      for (let j = 0; j < GRID_WIDTH; j++) {
+        grid[i][j] = 0; // Water
+      }
+    }
+
+    // Define the target number of land blocks
+    const TARGET_LAND_BLOCKS = 70;
+    let landBlocks = 0;
+
+    // Randomly generate a starting point for the landmass
+    let startX = Math.floor(Math.random() * GRID_WIDTH);
+    let startY = Math.floor(Math.random() * GRID_HEIGHT);
+
+    // Expand the landmass until reaching the target number of land blocks
+    while (landBlocks < TARGET_LAND_BLOCKS) {
+      // Set the current cell to land if it's within the grid bounds and not already land
+      if (grid[startY][startX] === 0) {
+        grid[startY][startX] = 1; // Land
+        landBlocks++;
+      }
+
+      // Randomly choose a neighboring cell to continue expanding the landmass
+      const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+      const [dx, dy] = directions[Math.floor(Math.random() * directions.length)];
+
+      // Calculate the next position
+      const nextX = startX + dx;
+      const nextY = startY + dy;
+
+      // Check if the next position is within the bounds of the grid
+      if (nextX >= 0 && nextX < GRID_WIDTH && nextY >= 0 && nextY < GRID_HEIGHT) {
+        // Move to the neighboring cell
+        startX = nextX;
+        startY = nextY;
+      }
+    }
+
+    // Output the grid to console (for visualization)
+    console.log(grid);
+    // Convert the grid array to a JSON string
+    const gridString = JSON.stringify(grid);
+    // Output the grid string to console
+    console.log(gridString);
+    const copiedGrid = JSON.parse(gridString);
+    console.log(copiedGrid);
+  }
+
+  // Hard coded good map to test with.
+  // grid = [[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,1,0,0,1,1,1,1],[1,1,1,0,0,0,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1,1,1,0,0,0]];
+  grid = [[0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0], [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0], [0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0], [1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0], [1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0], [1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0]]
+
+
+  // END MAP AREA
+
+
+  // Hard coded list of units to test with.
+  const units = [
+    {
+      id: 11,
+      ownerId: 1,
+      name: "mighty dwarf",
+      strength: 4,
+      defense: 3,
+      health: 175,
+      maxHealth: 175,
+      position: {x: 4, y: 3},
+      meleeDamage: 40
+      // TODO objects array for attack types?
+    },
+    {
+      id: 12,
+      ownerId: 1,
+      name: "ranger",
+      strength: 2,
+      defense: 3,
+      health: 150,
+      maxHealth: 150,
+      position: {x: 6, y: 4},
+      meleeDamage: 10,
+      rangeDamage: 30
+    },
+    {
+      id: 22,
+      ownerId: 2,
+      name: "skeleton",
+      strength: 2,
+      defense: 2,
+      health: 50,
+      maxHealth: 50,
+      position: {x: 8, y: 4},
+      meleeDamage: 10,
+    },
+    {
+      id: 23,
+      ownerId: 2,
+      name: "skeleton",
+      strength: 2,
+      defense: 2,
+      health: 50,
+      maxHealth: 50,
+      position: {x: 9, y: 3},
+      meleeDamage: 10,
+    }
+  ];
+
+  // Random unit to start turns.
+  let unitTurn = 11;
+
+  let currentUnit;
+  for (const unit of units) {
+    if (unit.id === unitTurn) {
+      currentUnit = unit;
+      break;
+    }
+  }
+
+
+  // Get references to unit panel elements
+  const unitPanel = document.getElementById('unitPanel');
+  const unitNameElement = document.getElementById('unitName');
+  const unitStrengthElement = document.getElementById('unitStrength');
+  const unitDefenseElement = document.getElementById('unitDefense');
+  const unitHealthElement = document.getElementById('unitHealth');
+  const unitMaxHealthElement = document.getElementById('unitMaxHealth');
+
+  // Get the popup element
+  const popup = document.getElementById('popup');
+
+  // Function to draw all units
+  function drawUnits() {
+    for (const unit of units) {
+      const {x, y} = unit.position;
+      const yOffset = y * HEX_HEIGHT * 1.5;
+      const xOffset = (y % 2 === 0 ? 0 : HEX_WIDTH / 2) + x * HEX_WIDTH;
+
+      ctx.fillStyle = unit.ownerId === 1 ? 'cyan' : 'red'; // Set color based on owner
+      if (unit.health <= 0) {
+        ctx.fillStyle = "#600202";
+      }
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = 2;
+      // TODO make method.
+      ctx.beginPath();
+      ctx.moveTo(xOffset + HEX_SIZE, yOffset);
+      ctx.lineTo(xOffset + HEX_WIDTH, yOffset + HEX_HEIGHT / 2);
+      ctx.lineTo(xOffset + HEX_WIDTH, yOffset + HEX_HEIGHT * 1.5);
+      ctx.lineTo(xOffset + HEX_SIZE, yOffset + HEX_HEIGHT * 2);
+      ctx.lineTo(xOffset, yOffset + HEX_HEIGHT * 1.5);
+      ctx.lineTo(xOffset, yOffset + HEX_HEIGHT / 2);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+
+      // Draw coordinates inside hexagon
+      ctx.fillStyle = 'black';
+      // ctx.fillText(`${x},${y}`, xOffset + HEX_SIZE - 10, yOffset + HEX_HEIGHT / 2);
+      const unitNameWidth = ctx.measureText(unit.name).width;
+      const textX = xOffset + (HEX_WIDTH - unitNameWidth) / 2;
+      const textY = yOffset + HEX_HEIGHT + 5;
+      ctx.fillText(unit.name, textX, textY);
+      ctx.fillText(`${unit.health}/${unit.maxHealth}`, xOffset + HEX_SIZE - 15, yOffset + HEX_HEIGHT / 1.5);
+
+      // Draw green border if it's this units turn
+      //TODO DO THIS LAST SO ITS ON TOP!
+      if (unitTurn === unit.id) {
+        ctx.strokeStyle = 'green';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(xOffset - 5, yOffset - 5, HEX_WIDTH + 10, HEX_HEIGHT + 40);
+      }
+    }
+  }
+
+  // Do player move and attack here also.
+  // Add event listener to canvas for click events, for the whole map.
+  canvas.addEventListener('click', function (event) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Calculate the grid position of the clicked hexagon
+    const y = Math.floor(mouseY / (HEX_HEIGHT * 1.5));
+    const x = Math.floor((mouseX - (y % 2) * (HEX_WIDTH / 2)) / HEX_WIDTH);
+    console.log(`Debug clicked on hex ${x},${y}`)
+
+    // Check if a unit is clicked.
+    let targetUnit = null;
+    for (const unit of units) {
+      if (unit.position.x === x && unit.position.y === y) {
+        // Clicked on a unit, update unit panel  (MAYBE DONT IF WE ARE ATTACKING TARGET)
+        updateUnitPanel(unit);
+        targetUnit = unit;
+        console.log("Targeting unit id =", unit.id)
+        break;
+      }
+    }
+
+    // TODO see if any other unit is clicked attackable.
+    // TODO see if any land blocker is clicked, or water.
+    // TODO Try and move this unit to this hex
+    // For now, ONLY allow 1 move distance.
+    // Find the unit with unitTurn as id
+    // TODO highlight move range.
+
+
+    if (currentUnit.ownerId === 1) {
+      // See if we are trying to attack now.
+      if (targetUnit) {
+        if (targetUnit.ownerId === currentUnit.ownerId) {
+          console.log("Cant attack self, skipping.");
+          return;
+        }
+        console.log("ATTACKING NOW")
+        targetUnit.health -= currentUnit.meleeDamage;
+
+        // TODO attack back...
+        if (targetUnit.health <= 0) {
+          // Call the function to display the popup
+          showPopup();
+        }
+
+        gotoNextTurn();
+        updateGame();
+        return;
+      }
+      // TODO need Move and attack option too
+
+
+      console.log(` debug playerUnit1.position. = `, currentUnit.position);
+      const moveDist = hexDistance(currentUnit.position.x, currentUnit.position.y, x, y)
+      console.log(`DEBUG moveDist=${moveDist}`)
+      if (moveDist > 1) {
+        console.log("Too far away")
+        return;
+      } else {
+
+        // TODO MAKE METHOD.
+        // Block moving in water.
+        if (grid[x][y] === 0) {
+          console.log(`Cant move player into water. at ${x},${y}`);
+          return;
+        }
+
+        // Do move now, advance turn!
+        currentUnit.position = {x: x, y: y};
+        gotoNextTurn();
+        updateGame();
+      }
+    }
+
+  });
+
+
+
+
+  // Function to display the popup
+  function showPopup() {
+    // Set initial styles
+    popup.style.opacity = '1';
+    popup.style.fontSize = '20px';
+
+    // Set the text content
+    popup.textContent = 'DEAD!';
+
+    // Increase font size
+    popup.style.fontSize = '40px';
+
+    // Decrease font size after a delay
+    setTimeout(() => {
+      popup.style.fontSize = '20px';
+    }, 500);
+
+    // Fade out after a delay
+    setTimeout(() => {
+      popup.style.opacity = '0';
+    }, 1000);
+  }
+
+
+  // Given a hex x, y find unit there if exists.
+  function findUnitAt(x, y) {
+    for (const unit of units) {
+      if (unit.position.x === x && unit.position.y === y) {
+        return unit;
+      }
+    }
+  }
+
+  function gotoNextTurn() {
+    // Find the index of the current unit
+    let currentIndex = units.findIndex(unit => unit.id === unitTurn);
+
+    // If currentIndex is not found or at the end of array, start from the beginning
+    let nextUnit = null;
+    if (currentIndex === -1 || currentIndex === units.length - 1) {
+      nextUnit = units[0]
+    } else {
+      // Otherwise, set the next unit's turn
+      currentIndex++;
+      nextUnit = units[currentIndex];
+    }
+
+    // If dead, continue to next unit or end game.
+    let tries = 0;
+    while (nextUnit.health <= 0 && tries <= 100) {
+      tries++;
+      console.log("Skipping unit id cause dead id=" + nextUnit.id);
+      currentIndex++;
+      if (currentIndex === units.length - 1) {
+        currentIndex = 0;
+      }
+      nextUnit = units[currentIndex]
+    }
+
+    // TODO check if one side or another has died, no alive units left.
+
+
+    currentUnit = nextUnit;
+    unitTurn = currentUnit.id;
+
+    if (tries >= 100) {
+      console.log("Game has finished! all dead. ")
+      return;
+    }
+    // Log the new unit turn for demonstration
+    console.log(`Next turn: ${unitTurn}`);
+
+    // TODO if an AI turn, add in a pause, then make the turn.
+  }
+
+  // Function to update unit panel with unit information
+  function updateUnitPanel(unit) {
+    unitNameElement.textContent = unit.name;
+    unitStrengthElement.textContent = unit.strength;
+    unitDefenseElement.textContent = unit.defense;
+    unitHealthElement.textContent = unit.health;
+    unitMaxHealthElement.textContent = unit.maxHealth;
+  }
+
+  // Function to calculate distance between two hexagons using offset coordinates
+  function hexDistance(p1x, p1y, p2x, p2y) {
+    ax = p1x - Floor2(p1y);
+    ay = p1x + Ceil2(p1y);
+    bx = p2x - Floor2(p2y);
+    by = p2x + Ceil2(p2y)
+    dx = bx - ax;
+    dy = by - ay;
+    if (Math.sign(dx) === Math.sign(dy)) {
+      return Math.max(Math.abs(dx), Math.abs(dy));
+    }
+    return Math.abs(dx) + Math.abs(dy);
+  }
+
+  function Floor2(x) {
+    return ((x >= 0) ? (x >> 1) : (x - 1) / 2);
+  }
+
+  function Ceil2(x) {
+    return ((x >= 0) ? ((x + 1) >> 1) : x / 2);
+  }
+
+
+  moveAIButton.addEventListener('click', () => {
+    // Call the doAITurn method for the player unit
+    doAITurn(currentUnit);
+  });
+
+  attackButton.addEventListener('click', () => {
+    // Implement player attack logic
+    // For simplicity, let's just check if player is adjacent to enemy
+    // TODO ranged attacks.
+    const distanceX = Math.abs(currentUnit.position.x - currentUnit.position.x);
+    const distanceY = Math.abs(currentUnit.position.y - currentUnit.position.y);
+    if ((distanceX <= 1 && distanceY === 0) || (distanceY <= 1 && distanceX === 0) || (distanceX === 1 && distanceY === 1)) {
+      alert('Enemy attacked!');
+      // TODO do damage
+    } else {
+      alert('Too far get closer.');
+    }
+  });
+
+
+  function drawGrid() {
+    for (let i = 0; i < GRID_HEIGHT; i++) {
+      for (let j = 0; j < GRID_WIDTH; j++) {
+        drawHex(j, i);
+      }
+    }
+  }
+
+  function drawHex(x, y) {
+    const yOffset = y * HEX_HEIGHT * 1.5;
+    const xOffset = (y % 2 === 0 ? 0 : HEX_WIDTH / 2) + x * HEX_WIDTH;
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+
+    // Set the fill style based on cell value (0 for water, 1 for land)
+    ctx.fillStyle = grid[x][y] === 0 ? WATER_COLOR : LAND_COLOR;
+
+    ctx.beginPath();
+    ctx.moveTo(xOffset + HEX_SIZE, yOffset);
+    ctx.lineTo(xOffset + HEX_WIDTH, yOffset + HEX_HEIGHT / 2);
+    ctx.lineTo(xOffset + HEX_WIDTH, yOffset + HEX_HEIGHT * 1.5);
+    ctx.lineTo(xOffset + HEX_SIZE, yOffset + HEX_HEIGHT * 2);
+    ctx.lineTo(xOffset, yOffset + HEX_HEIGHT * 1.5);
+    ctx.lineTo(xOffset, yOffset + HEX_HEIGHT / 2);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fill();
+
+    // Draw coordinates inside hexagon
+    ctx.fillStyle = 'black';
+    ctx.fillText(`${x},${y}`, xOffset + HEX_SIZE - 10, yOffset + HEX_HEIGHT / 2);
+  }
+
+  function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function updateGame() {
+    clearCanvas();
+    drawGrid();
+    drawUnits();
+  }
+
+  updateGame();
+</script>
+</body>
+</html>
