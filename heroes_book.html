@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hero Display</title>
+    <style>
+        body {
+            background-color: #121212; /* Dark background color */
+            color: #ffffff; /* White text color */
+        }
+
+        /* Update the CSS for the heroContainer */
+        .heroContainer {
+            display: flex; /* Use flexbox layout */
+            flex-wrap: wrap; /* Allow wrapping to create multiple rows */
+            justify-content: center; /* Center the tiles horizontally */
+            width: 700px; /* Set the width to fit 5 boxes */
+            /* NOT GREAT BUT WORKS FOR NOW LOL */
+            margin: 0 auto; /* Center the container horizontally */
+            padding: 10px; /* Add padding around the container */
+            box-sizing: border-box; /* Include padding in width */
+        }
+
+        /* Add styles for the tile */
+        .tile {
+            display: inline-block;
+            width: 100px; /* Adjust width as needed */
+            height: 120px; /* Adjust height as needed */
+            margin: 10px; /* Adjust margin as needed */
+            border: 1px solid black; /* Add border for each tile */
+            box-sizing: border-box; /* Include border in width and height */
+            text-align: center; /* Center content horizontally */
+            position: relative; /* Set position to relative */
+            background-color: #f0f0f0; /* Light grey background color */
+        }
+
+        /* Add styles for the selected tile */
+        .selected {
+            border: 2px solid gold; /* Add a gold border */
+            box-shadow: 0 0 5px gold; /* Add a gold shadow effect */
+        }
+
+        .hero {
+            position: relative; /* Set position to relative */
+        }
+
+        .heroImage {
+            max-width: 100%; /* Ensure image fits within container */
+            max-height: 80px; /* Adjust max height as needed */
+        }
+
+        .emptyImage {
+            max-width: 50%; /* Make empty image smaller */
+            max-height: 40px; /* Make empty image smaller */
+            /*position: relative; !* Set position to relative *!*/
+        }
+
+        .level {
+            position: absolute; /* Position level text absolutely */
+            color: #000000; /* Black text color */
+            top: 5px; /* Adjust top position as needed */
+            left: 5px; /* Adjust left position as needed */
+        }
+
+        .colorBar {
+            position: absolute; /* Position color bar absolutely */
+            bottom: -5px; /* Adjust bottom position as needed */
+            left: 0; /* Align color bar to left edge */
+            width: 100%; /* Set color bar width to fill container */
+            height: 5px; /* Adjust height of color bar as needed */
+        }
+
+        .heroName {
+            color: #000000; /* Black text color */
+        }
+
+
+        .common {
+            background-color: grey;
+        }
+        .uncommon {
+            background-color: green;
+        }
+        .rare {
+            background-color: blue;
+        }
+        .epic {
+            background-color: gold;
+        }
+        .legendary {
+            background-color: purple;
+        }
+
+    </style>
+</head>
+<body>
+<div id="heroContainer" class="heroContainer"></div>
+
+<script>
+
+  // Hard coded heroes list.
+  const heroConfigs = {
+    1: {name: "mighty dwarf", "rarity": "rare"},
+    2: {name: "ranger", "rarity": "epic"},
+    3: {name: "priest", "rarity": "uncommon"}
+  }
+
+  // Hard coded list of units to test with.
+  const units = {
+    11: {
+      id: 11,
+      armyId: 11,
+      ownerId: 1,
+      name: "mighty dwarf",
+      heroConfigId: 1,
+      strength: 4,
+      defense: 3,
+      health: 175,
+      maxHealth: 175,
+      position: {x: 4, y: 3},
+      meleeDamage: 40,
+      level: 1,
+      experience: 0,
+      rank: 0,
+      bookPosition: 3
+    },
+    12: {
+      id: 12,
+      armyId: 11,
+      ownerId: 1,
+      name: "ranger",
+      heroConfigId: 2,
+      strength: 2,
+      defense: 3,
+      health: 150,
+      maxHealth: 150,
+      position: {x: 6, y: 4},
+      meleeDamage: 10,
+      rangeDamage: 30,
+      level: 1,
+      experience: 0,
+      rank: 0,
+      bookPosition: 6
+    }
+  };
+
+
+  document.addEventListener("DOMContentLoaded", function () {
+    // Call the createHeroTiles method
+    createHeroTiles();
+  });
+
+
+  let selectedHero = null; // Variable to store the selected hero
+
+  function createHeroTiles() {
+    const heroContainer = document.getElementById("heroContainer");
+    heroContainer.innerHTML = ''; // Clear the heroContainer
+
+    const maxPositions = 5 * 4; // Assuming 5 heroes per row and 4 rows
+    // TODO ADD IN PAGING ALSO.
+
+    for (let i = 1; i <= maxPositions; i++) {
+      const tileDiv = document.createElement("div");
+      tileDiv.classList.add("tile");
+
+      const heroDiv = document.createElement("div");
+      heroDiv.classList.add("hero");
+
+      const unit = Object.values(units).find(unit => unit.bookPosition === i);
+      if (unit) {
+        createHeroTile(unit, heroDiv, tileDiv);
+      } else {
+        createEmptyTile(heroDiv, i, tileDiv);
+      }
+
+      tileDiv.appendChild(heroDiv);
+      heroContainer.appendChild(tileDiv);
+    }
+  }
+
+  // Method to highlight the selected tile
+  function highlightTile(tileDiv) {
+    // Remove highlight from all tiles first
+    document.querySelectorAll('.tile').forEach(tile => {
+      tile.classList.remove('selected');
+    });
+    // Add highlight to the selected tile
+    tileDiv.classList.add('selected');
+  }
+
+  // Method to create hero tile
+  function createHeroTile(unit, heroDiv, tileDiv) {
+    const heroConfig = heroConfigs[unit.heroConfigId];
+
+    const image = document.createElement("img");
+    image.src = "images/hero_images/" + unit.name.toLowerCase().replace(/\s/g, "_") + ".png";
+    image.alt = unit.name;
+    image.classList.add("heroImage");
+    heroDiv.appendChild(image);
+
+    const level = document.createElement("span");
+    level.textContent = unit.level;
+    level.classList.add("level");
+    heroDiv.appendChild(level);
+
+    // Create hero name element
+    const heroName = document.createElement("span");
+    heroName.textContent = unit.name; // Assuming unit has a name property
+    heroName.classList.add("heroName"); // Add the heroName class
+    heroDiv.appendChild(heroName); // Append hero name to hero div
+
+    const colorBar = document.createElement("div");
+    colorBar.classList.add("colorBar");
+    colorBar.classList.add(heroConfig.rarity);
+    heroDiv.appendChild(colorBar);
+
+    // Add click event listener for hero
+    heroDiv.addEventListener('click', () => {
+      if (selectedHero === unit) {
+        // Deselect the selected hero
+        selectedHero = null;
+        // Remove highlight from the tile
+        tileDiv.classList.remove('selected');
+      } else if (selectedHero) {
+        // Swap positions if a hero is already selected
+        const tempPosition = selectedHero.bookPosition;
+        selectedHero.bookPosition = unit.bookPosition;
+        unit.bookPosition = tempPosition;
+        // Deselect the selected hero
+        selectedHero = null;
+        // Update UI to reflect the movement
+        createHeroTiles();
+      } else {
+        // Select the clicked hero
+        selectedHero = unit;
+        // Highlight the tile
+        highlightTile(tileDiv);
+      }
+      console.log(`Selected hero: ${selectedHero ? selectedHero.name : 'None'}`);
+    });
+
+  }
+
+  // Method to create empty tile
+  function createEmptyTile(heroDiv, position, tileDiv) {
+    // Add an empty character image
+    const emptyImage = document.createElement("img");
+    emptyImage.src = "images/hero_images/empty_char.png";
+    emptyImage.alt = "Empty";
+    emptyImage.classList.add("emptyImage");
+    heroDiv.appendChild(emptyImage);
+
+    // Add a level for empty character
+    const emptyLevel = document.createElement("span");
+    emptyLevel.textContent = ""; // Or any default level
+    emptyLevel.classList.add("level");
+    heroDiv.appendChild(emptyLevel);
+
+    // Add an empty color bar
+    const emptyColorBar = document.createElement("div");
+    emptyColorBar.classList.add("colorBar");
+    heroDiv.appendChild(emptyColorBar);
+
+    // Add click event listener for empty tile
+    tileDiv.addEventListener('click', () => {
+      if (selectedHero) {
+        console.log(`Moving hero ${selectedHero.name} to position ${position}`);
+        selectedHero.bookPosition = position; // Update bookPosition of the selected hero
+        // Reset selectedHero
+        selectedHero = null;
+
+        // Update UI to reflect the movement
+        createHeroTiles();
+      }
+    });
+  }
+
+
+
+</script>
+</body>
+</html>

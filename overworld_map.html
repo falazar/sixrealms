@@ -50,10 +50,10 @@
 </head>
 <body>
 
-<canvas id="gameCanvas" width="800" height="600"></canvas>
+<canvas id="gameCanvas" width="1050" height="890" style="background-color:darkblue;"></canvas>
 
 <div id="armyPanel"
-     style="position: absolute; top: 0; left: 810px; width: 300px; height: 100%; background-color: #59b4f3; border: 2px solid gold; box-shadow: 0px 0px 5px black; padding: 10px;">
+     style="position: absolute; top: 0; left: 1060px; width: 300px; height: 100%; background-color: #59b4f3; border: 2px solid gold; box-shadow: 0px 0px 5px black; padding: 10px;">
     <h2>Army Info</h2>
     <span style="font-weight: bold">Army Name:</span> <span id="armyName"></span> <br>
     <span style="font-weight: bold">Id:</span> <span id="armyId"></span> <br>
@@ -75,13 +75,20 @@
 
   const HEX_SIZE = 30; // Size of each hexagon
   const HEX_HEIGHT = HEX_SIZE; // Height of the hexagon
-  const HEX_WIDTH = HEX_SIZE * 2; // Width of the hexagon
-  const GRID_WIDTH = 13; // Number of hexagons in a row
-  const GRID_HEIGHT = 13; // Number of hexagons in a column
+  const HEX_WIDTH = HEX_SIZE * 2; // Width of the hexagon??
+  const GRID_WIDTH = 17; // Number of hexagons in a row
+  const GRID_HEIGHT = 19; // Number of hexagons in a column
 
   // Define colors for water and land
   const WATER_COLOR = 'darkblue';
   const LAND_COLOR = '#F4A460';
+
+  // Hard coded heroes list.
+  const heroConfigs = {
+    1: {name: "mighty dwarf", "rarity": "rare"},
+    2: {name: "ranger", "rarity": "epic"},
+    3: {name: "priest", "rarity": "uncommon"}
+  }
 
 
   // START MAP AREA
@@ -91,17 +98,17 @@
 
   function createNewMap() {
     // Initialize the grid with water (0) everywhere
-    for (let i = 0; i < GRID_HEIGHT; i++) {
+    for (let i = 0; i < GRID_WIDTH; i++) {
       grid[i] = [];
-      for (let j = 0; j < GRID_WIDTH; j++) {
-        // grid[i][j] = {terrain: 0, armyId: null, resourceId: null, ownerId: null}; // Water
-        grid[i][j] = {terrain: 0}; // Water
+      for (let j = 0; j < GRID_HEIGHT; j++) {
+        grid[i][j] = {terrain: 0}; // Water default.
       }
     }
 
     // Define the target number of land blocks
-    const TARGET_LAND_BLOCKS = 70;
+    const TARGET_LAND_BLOCKS = 150; // do percent instead?
     let landBlocks = 0;
+    // TODO make shallow water hex color.
 
     // Randomly generate a starting point for the landmass
     let startX = Math.floor(Math.random() * GRID_WIDTH);
@@ -110,14 +117,15 @@
     // Expand the landmass until reaching the target number of land blocks
     while (landBlocks < TARGET_LAND_BLOCKS) {
       // Set the current cell to land if it's within the grid bounds and not already land
-      if (grid[startY][startX].terrain === 0) {
-        grid[startY][startX].terrain = 1; // Land
-        setResource(grid[startY][startX]);
+      if (grid[startX][startY].terrain === 0) {
+        grid[startX][startY].terrain = 1; // Land
+        setResource(grid[startX][startY]);
         landBlocks++;
+        // console.log(`Adding ${landBlocks} at ${startX},${startY}`)
       }
 
       // Randomly choose a neighboring cell to continue expanding the landmass
-      const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+      const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]; // not tech right but close enough.
       const [dx, dy] = directions[Math.floor(Math.random() * directions.length)];
 
       // Calculate the next position
@@ -147,661 +155,1432 @@
     // right click in console to copy map object.
   }
 
+  function setupOrbResources(gridCell) {
+    // Define divisors for each rarity level
+    const rarityDivisors = {
+      common: 1,
+      uncommon: 2,
+      rare: 3,
+      epic: 4,
+      legendary: 5
+    };
+
+    // If the resource type is 'o' (orbs), set a random resourceId (1-10) to represent which hero it is.
+    const resourceId = Math.floor(Math.random() * 3) + 1;
+    gridCell.resourceId = resourceId;
+
+    // Define the rarity of the hero
+    const heroRarity = heroConfigs[resourceId].rarity;
+    // Calculate the divisor based on the hero's rarity
+    const divisor = rarityDivisors[heroRarity];
+
+    // Calculate the adjusted resource amount based on the divisor
+    let resourceAmount = Math.floor(Math.random() * 30) + 3;  // 3-33
+    resourceAmount = Math.ceil(resourceAmount / divisor);
+
+    // Set the resourceAmount field in the gridCell
+    gridCell.resourceAmount = resourceAmount;
+    console.log(`Setting resourceId=${resourceId}`)
+    console.log(`Setting resourceAmount=${resourceAmount}`)
+
+  }
+
   // Picks a random resource to show on this hex, and gain when take over.
   function setResource(gridCell) {
     // Set resource type randomly to o, g, e, or s
     // orbs, gold, experience scroll, or summon token.
-    // key too?
+    // key too? healing resting...
     const resourceTypes = ['o', 'g', 'e', 's'];
     const randomIndex = Math.floor(Math.random() * resourceTypes.length);
     const resourceType = resourceTypes[randomIndex];
     gridCell.resourceType = resourceType;
 
-    // If the resource type is 'o' (ore), set a random resourceId (1-10)
-    if (resourceType === 'o') {
-      const resourceId = Math.floor(Math.random() * 10) + 1;
-      gridCell.resourceId = resourceId;
+    // TODO these increase on harder maps, as we go further north.
+    gridCell.resourceAmount = 1;
+    switch (resourceType) {
+      case 'o':
+        setupOrbResources(gridCell);
+        break;
+      case 'g':
+        gridCell.resourceAmount = Math.floor(Math.random() * 2000) + 2000;
+        break;
+      case 'e':
+        gridCell.resourceAmount = Math.floor(Math.random() * 6) + 1;  // scrolls
+        break;
+      case 's':
+        gridCell.resourceAmount = 1;
+        break;
+      default:
+        gridCell.resourceAmount = 1;
     }
   }
 
 
-  createNewMap(); // temp to create new map.
-
-    // Sample hard coded map here.
-  grid =
+  // Sample hard coded map here. paste to add new one.
+  grid = [
     [
-      [
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 7
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 1
-        },
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        }
-      ],
-      [
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 9
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 4
-        },
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        }
-      ],
-      [
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 7
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 1
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        }
-      ],
-      [
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 1
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 5
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 7
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        }
-      ],
-      [
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 8
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 5
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 2
-        },
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        }
-      ],
-      [
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 7
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 4
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        }
-      ],
-      [
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 6
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 9
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        }
-      ],
-      [
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 9
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 3
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 8
-        },
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 0
-        }
-      ],
-      [
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 1,
-          "resourceType": "s"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "o",
-          "resourceId": 1
-        },
-        {
-          "terrain": 0
-        }
-      ],
-      [
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 1,
-          "resourceType": "g"
-        },
-        {
-          "terrain": 1,
-          "resourceType": "e"
-        }
-      ],
-      [
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        }
-      ],
-      [
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        }
-      ],
-      [
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        },
-        {
-          "terrain": 0
-        }
-      ]
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3243
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3944
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3584
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 8,
+        "resourceId": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 5,
+        "resourceId": 2
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3461
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 5
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 5,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 7,
+        "resourceId": 2
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3601
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 3,
+        "resourceId": 1
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 8,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 6
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 4,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3094
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 5
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 3,
+        "resourceId": 1
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 4
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 7,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3228
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 4,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 4
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 10,
+        "resourceId": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 2369
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 16,
+        "resourceId": 3
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 6
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 5,
+        "resourceId": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 9,
+        "resourceId": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 4
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 4,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3823
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 8,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 6
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 2329
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 5
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 6
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 5
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 6,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 11,
+        "resourceId": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 4,
+        "resourceId": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 7,
+        "resourceId": 2
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 3,
+        "resourceId": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3309
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 5,
+        "resourceId": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3962
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 5
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3655
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 6
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 8,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 12,
+        "resourceId": 3
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3715
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 2217
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 6
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 4
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 4,
+        "resourceId": 2
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3642
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 2049
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 2734
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 1,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3518
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 2129
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 2,
+        "resourceId": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3849
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 6
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 2628
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 6
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 4
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 5,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 4,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 14,
+        "resourceId": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3333
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3868
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 6
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3103
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 1,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3943
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 2557
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 1,
+        "resourceId": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 5,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 2708
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 6
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3704
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 6
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 7,
+        "resourceId": 1
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 2896
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 11,
+        "resourceId": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3163
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 3,
+        "resourceId": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 4,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 7,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 9,
+        "resourceId": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "g",
+        "resourceAmount": 3277
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 5
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 2,
+        "resourceId": 1
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 3,
+        "resourceId": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 3
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 4
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 2,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 3,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "s",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 6,
+        "resourceId": 2
+      },
+      {
+        "terrain": 1,
+        "resourceType": "e",
+        "resourceAmount": 1
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 9,
+        "resourceId": 3
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 1,
+        "resourceType": "o",
+        "resourceAmount": 9,
+        "resourceId": 3
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      }
+    ],
+    [
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      },
+      {
+        "terrain": 0
+      }
     ]
+  ]
+
+  // Uncomment to get a new map.
+  // createNewMap(); // temp to create new map.
+
 
   // END MAP AREA
 
 
   // Setup who owns hexes.
   // TODO pull from db.
-  grid[6][7].ownerId = 1;
+  grid[4][7].ownerId = 1;
   grid[8][10].ownerId = 2;
+
 
   // TODO include all units in each army...
 
@@ -813,7 +1592,7 @@
       name: "dwarf crew",
       power: 20000,
       exhaustion: 0,
-      position: {x: 6, y: 6},
+      position: {x: 4, y: 6},
       moveRange: 5
     },
     12: {
@@ -822,7 +1601,7 @@
       name: "ranger crew",
       power: 20000,
       exhaustion: 0,
-      position: {x: 7, y: 6},
+      position: {x: 5, y: 6},
       moveRange: 5
     },
     22: {
@@ -844,6 +1623,7 @@
       moveRange: 1
     }
   };
+  // TODO add mapId
 
   // Hard coded list of units to test with.
   const units = {
@@ -852,26 +1632,33 @@
       armyId: 11,
       ownerId: 1,
       name: "mighty dwarf",
+      heroConfigId: 1,
       strength: 4,
       defense: 3,
       health: 175,
       maxHealth: 175,
       position: {x: 4, y: 3},
-      meleeDamage: 40
-      // TODO objects array for attack types?
+      meleeDamage: 40,
+      level: 1,
+      experience: 0,
+      rank: 0
     },
     12: {
       id: 12,
       armyId: 11,
       ownerId: 1,
       name: "ranger",
+      heroConfigId: 2,
       strength: 2,
       defense: 3,
       health: 150,
       maxHealth: 150,
       position: {x: 6, y: 4},
       meleeDamage: 10,
-      rangeDamage: 30
+      rangeDamage: 30,
+      level: 1,
+      experience: 0,
+      rank: 0
     },
     22: {
       id: 22,
@@ -884,6 +1671,9 @@
       maxHealth: 50,
       position: {x: 8, y: 4},
       meleeDamage: 10,
+      level: 1,
+      experience: 0,
+      rank: 0
     },
     23: {
       id: 23,
@@ -896,6 +1686,9 @@
       maxHealth: 50,
       position: {x: 9, y: 3},
       meleeDamage: 10,
+      level: 1,
+      experience: 0,
+      rank: 0
     }
   };
 
@@ -947,6 +1740,7 @@
     const y = Math.floor(mouseY / (HEX_HEIGHT * 1.5));
     const x = Math.floor((mouseX - (y % 2) * (HEX_WIDTH / 2)) / HEX_WIDTH);
     console.log(`Debug clicked on hex ${x},${y}`)
+    console.log(`DEBUG hex info = `, grid[x][y])
 
     // Check if an army was clicked.
     const targetArmy = armies[grid[x][y].armyId];
@@ -1013,7 +1807,7 @@
         return;
       }
 
-      // TODO make sure hex is touching another hex we own, or we cannot attack or move.
+      // Make sure hex is touching another hex we own, or we cannot attack or move.
       if (!isTouchingHexWeOwn(x, y)) {
         alert("Must be touching a hex you own. ")
         return;
@@ -1048,8 +1842,9 @@
 
       currentArmy.position = {x: x, y: y};
       // If we dont own it already, grab resources.
-      if (currentArmy.ownerId !== 1) {
-        collectResource(x,y);
+      if (currentArmy.ownerId === 1 && currentArmy.ownerId !== grid[currentArmy.position.x][currentArmy.position.y].ownerId) {
+        // TODO hard coded ownerid
+        collectResource(x, y);
       }
       // TODO maybe delay an hour or two for these so people dont trade them back and forth easy for free?
       grid[currentArmy.position.x][currentArmy.position.y].armyId = currentArmy.id;
@@ -1139,9 +1934,7 @@
 
   function collectResource(x, y) {
     const hex = grid[x][y];
-    const resourceName = getResourceName(hex.resourceType);
-
-    // TODO add actual resource to your inventory.
+    const resourceName = getResourceName(hex.resourceType, hex.resourceId);
 
     // Create a popup window
     const popup = document.createElement('div');
@@ -1149,7 +1942,7 @@
 
     // Create content for the popup
     const content = document.createElement('div');
-    content.textContent = `You collected ${resourceName} from this hex.`;
+    content.innerHTML = `You collected ${hex.resourceAmount.toLocaleString()} ${resourceName} from this hex. <br>`;
 
     // Create a close button
     const closeButton = document.createElement('button');
@@ -1164,10 +1957,10 @@
 
     // Add the popup to the document body
     document.body.appendChild(popup);
+
+    // TODO add actual resource to your inventory.
+
   }
-
-
-
 
 
   // Draw each hex, either the army if occupied or the regular terrain there.
@@ -1180,7 +1973,9 @@
     const hex = grid[x][y];
 
     // Is there an army on this hex?
-    if (!grid[x][y].armyId) {
+    if (!grid[x][y]) {
+      console.log(`Err undefined hex at ${x},${y}`)
+    } else if (!grid[x][y].armyId) {
       // Show land terrain.
       // Set the fill style based on cell value (0 for water, 1 for land)
       ctx.fillStyle = grid[x][y].terrain === 0 ? WATER_COLOR : LAND_COLOR;
@@ -1237,18 +2032,22 @@
     }
 
     // If hex is not owned by you, show resource set there.
-    if (hex.ownerId !== 1 && hex.terrain !== 0) {
-      const resourceName = getResourceName(hex.resourceType);
+    if (hex && hex.ownerId !== 1 && hex.terrain !== 0) {
+      const resourceName = getResourceName(hex.resourceType, hex.resourceId);
       ctx.fillStyle = 'black';
       ctx.fillText(`${resourceName}`, xOffset + HEX_SIZE - 10, yOffset + HEX_HEIGHT / 2 + 10);
+      // three images.
+      // https://five-heroes.fandom.com/wiki/Items_%26_Shop
     }
 
   }
 
-  function getResourceName(resourceType) {
+  function getResourceName(resourceType, resourceId) {
     switch (resourceType) {
       case 'o':
-        return 'Orbs';
+        // TODO2
+        const heroName = heroConfigs[resourceId]?.name;
+        return `${heroName}\norbs`;
       case 'g':
         return 'Gold';
       case 'e':
@@ -1263,6 +2062,7 @@
   function isTouchingHexWeOwn(x, y) {
     const currentPlayerId = 1; // HARDCODED
 
+    // console.log(`Checking from pos ${x},${y}`)
     // Check if any neighboring hexagon is owned by the player
     const neighbors = [
       {dx: 1, dy: 0},  // Right
@@ -1270,9 +2070,8 @@
       {dx: 0, dy: 1},  // Down
       {dx: 0, dy: -1}, // Up
       {dx: y % 2 === 0 ? -1 : 1, dy: -1}, // Up-Right
-      {dx: y % 2 === 0 ? 0 : 1, dy: 1}   // Down_Right? down left
+      {dx: y % 2 === 0 ? -1 : 1, dy: 1}   // Down_Right? down left
     ];
-    // odd 3,3 to 4,4   +1,+1 is not here...
 
     for (const neighbor of neighbors) {
       const neighborX = x + neighbor.dx;
@@ -1280,9 +2079,10 @@
 
       // Check if the neighboring hexagon is within bounds
       if (neighborX >= 0 && neighborX < GRID_WIDTH && neighborY >= 0 && neighborY < GRID_HEIGHT) {
+        // console.log(`DEBUG: check at at x,y= ${neighborX}, ${neighborY}, grid[neighborX][neighborY].ownerId=${grid[neighborX][neighborY].ownerId} `);
         // Check if the neighboring hexagon is owned by the player
         if (grid[neighborX][neighborY].ownerId === currentPlayerId) {
-          console.log("hit good at x,y=", neighborX, neighborY);
+          // console.log("DEBUG: hit good at x,y=", neighborX, neighborY);
           return true; // At least one neighboring hexagon is owned by the player
         }
       }
@@ -1413,16 +2213,15 @@
   }
 
 
-
-
+  // Draw main hex map with all details, based on grid. rename?
   function drawGrid() {
-    for (let i = 0; i < GRID_HEIGHT; i++) {
-      for (let j = 0; j < GRID_WIDTH; j++) {
-        drawHex(j, i);
+    for (let j = 0; j < GRID_HEIGHT; j++) {
+      for (let i = 0; i < GRID_WIDTH; i++) {
+        drawHex(i, j);
       }
     }
 
-    // Show selected army.
+    // Show selected army. or hex?
     // Draw green border if it's this army turn.
     if (currentArmy) {
       ctx.strokeStyle = 'green';
@@ -1464,17 +2263,21 @@ PHASE ONE:
         gold,
         exp scrolls.
         orbs
-
+        training tokens
+        summon tokens.
+        tomes
 
     MAPS:
         Increase map size. Flexible sizes/
 
     ARMIES & UNITS:
-        Make Army View page.
-
+        Make Unit list View page.
+            and Unit show panel.
+        Add summon page.
         Add level and rank for units.
-
         Add training for units.
+        Add rest hourly job to take away exhaustion.
+        Add power calc - based on stats and gear.
 
     FIGHTING:
         Finish Quick Fight Panel.
@@ -1482,10 +2285,11 @@ PHASE ONE:
         Add default? armies on hexes unowned.
 
     GRAPHICS:
-        Add army images.
+        Add unit images.
+        https://five-heroes.fandom.com/wiki/Enemies
 
 
-    Setup Github project.
+    DONE - Setup Github project.
 
     Talk with Scouter see if he wants to join.
 
@@ -1507,13 +2311,30 @@ PHASE ONE:
 
 
 PHASE TWO:
-    Make multiple maps.
+    MAPS:
+        Make multiple maps.
+        Make diff terrains
 
-    Add expeditions.
+        Make Fight Map fully working.
+        Automate fight map.
+        Add Storyline maps
+            - and square explore maps.
 
-    Add mines.
+    AI:
+        Make AI turns every our or so, balance with neighbors.
+        Tie in ai chatting withchatgpt and such, personalities.
 
-    Add secondary stats for units.
+    ZONES:
+        Add expeditions.
+        Add arenas.
+        Add mines.
+
+    Heroes:
+        Add secondary stats for heroes.
+        Add gear to find
+        Add equip gear spots
+        Add Hero templates.
+
 
 
 PHASE THREE:
