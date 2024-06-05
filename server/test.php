@@ -1363,13 +1363,6 @@ $grid = [
 function createDbConnection()
 {
     global $servername, $username, $password, $dbname;
-
-//    $servername = "mysql.falazar.com";
-//    $username = "falazar";
-//    $password = "Buggeroffnow42";
-//    $dbname = "sixheroes";
-
-
     print "Prepping database.";
 
     // Create connection
